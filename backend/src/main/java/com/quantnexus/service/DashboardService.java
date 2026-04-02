@@ -1,0 +1,153 @@
+package com.quantnexus.service;
+
+import com.quantnexus.domain.FinancialRecord;
+import com.quantnexus.domain.enums.TransactionType;
+import com.quantnexus.dto.financial.DashboardSummaryDTO;
+import com.quantnexus.dto.financial.FinancialHealthDTO;
+import com.quantnexus.dto.financial.MonthlyTrendDTO;
+import com.quantnexus.dto.financial.RecentActivityDTO;
+import com.quantnexus.repository.FinancialRecordRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.format.TextStyle;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * The "Analytics Engine" of the platform.
+ * It processes raw transaction data into human-readable insights
+ * like Savings Rates, Spending Trends, and Category Totals.
+ * * @author Manish Singh
+ */
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class DashboardService {
+
+    private final FinancialRecordRepository recordRepository;
+
+    @Transactional(readOnly = true)
+    public DashboardSummaryDTO getDashboardSummary(Long userId){
+        log.info("Generating real-time financial intelligence for User ID: {}", userId);
+
+        // 1. Fetch all records [In a high-load app, we'd use the Repo math]
+        List<FinancialRecord> allRecords = recordRepository.findByUserId(userId);
+
+        // 2. Calculate Totals using Functional Streams
+        BigDecimal totalIncome = calculateTotalByType(allRecords, TransactionType.INCOME);
+        BigDecimal totalExpenses = calculateTotalByType(allRecords, TransactionType.EXPENSE);
+        BigDecimal netBalance = totalIncome.subtract(totalExpenses);
+
+        // 3. Group Expenses by Category (Requirement #3: Category wise totals)
+        Map<String, BigDecimal>categoryTotals = allRecords.stream()
+                .filter(record -> record.getTransactionType() == TransactionType.EXPENSE)
+                .collect(Collectors.groupingBy(
+                        record -> record.getTransactionCategory().name(),
+                        Collectors.reducing(BigDecimal.ZERO,
+                                FinancialRecord::getAmount, BigDecimal::add)
+                ));
+
+        // 4. Feed Population: Identifying the 5 most recent activities
+        List<RecentActivityDTO> recentActivity = allRecords.stream()
+                .sorted(Comparator.comparing(FinancialRecord::getTransactionDate).reversed())
+                .limit(5)
+                .map(this::mapToRecentActivity)
+                .toList();
+
+        // 5. Generate Monthly Trends (Simple month-to-month comparison)
+        List<MonthlyTrendDTO>monthlyTrends = generateMonthlyTrends(allRecords);
+
+        // 6. Calculate Financial Health Score (The "Senior" Unique Logic)
+        FinancialHealthDTO healthScore = calculateFinancialHealth(totalIncome,netBalance);
+
+
+        return new DashboardSummaryDTO(
+                totalIncome,
+                totalExpenses,
+                netBalance,
+                categoryTotals,
+                monthlyTrends,
+                recentActivity,
+                healthScore
+        );
+    }
+
+
+    private BigDecimal calculateTotalByType(List<FinancialRecord> records,
+                                            TransactionType transactionType) {
+        return records.stream()
+                .filter(record -> record.getTransactionType() == transactionType)
+                .map(FinancialRecord::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * Groups data by Month for trend visualization.
+     */
+    private List<MonthlyTrendDTO> generateMonthlyTrends(List<FinancialRecord> allRecords) {
+        Map<String, List<FinancialRecord>> monthlyMap = new HashMap<>();
+        for(FinancialRecord record : allRecords){
+            String month = record.getTransactionDate().getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
+            monthlyMap.computeIfAbsent(month, k -> new ArrayList<>()).add(record);
+        }
+
+        List<MonthlyTrendDTO>trends = new ArrayList<>();
+        for(var entry : monthlyMap.entrySet()){
+            BigDecimal totalIncome = calculateTotalByType(entry.getValue(), TransactionType.INCOME);
+            BigDecimal totalExpenses = calculateTotalByType(entry.getValue(), TransactionType.EXPENSE);
+            trends.add(new MonthlyTrendDTO(entry.getKey(), totalIncome, totalExpenses));
+        }
+        return trends;
+    }
+
+    /**
+     * Calculates the savings rate and provides actionable financial advice.
+     */
+    private FinancialHealthDTO calculateFinancialHealth(BigDecimal totalIncome,
+                                                        BigDecimal netBalance) {
+        // Base case: Avoid division by zero if we have no income data
+        if(totalIncome.compareTo(netBalance) <= 0){
+            return new FinancialHealthDTO("INITIALIZING", 0.0, "Add your first income to calculate your health score.");
+        }
+
+        // Calculation: (Net Balance / Total Income) * 100
+        double savingRate = netBalance
+                .divide(totalIncome, 4, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100)).doubleValue();
+
+        String status;
+        String recommend;
+        // Adaptive thresholds for savings health status
+        if(savingRate >= 20.0){
+            status = "STABLE";
+            recommend = "Excellent behavior! You are saving more than the 20% benchmark.";
+        }else if(savingRate > 0){
+            status = "CAUTION";
+            recommend = "Good start. Review non-essential categories to reach 20% savings.";
+        }else{
+            status = "CRITICAL";
+            recommend = "Your expenses currently exceed your income. Immediate review suggested.";
+        }
+
+        return new FinancialHealthDTO(status, savingRate, recommend);
+    }
+
+
+    private RecentActivityDTO mapToRecentActivity(FinancialRecord record) {
+        return new RecentActivityDTO(
+                record.getReferenceNumber(),
+                record.getAmount(),
+                record.getTransactionType().name(),
+                record.getTransactionCategory().name(),
+                record.getTransactionDate(),
+                record.getDescription()
+        );
+    }
+
+}
