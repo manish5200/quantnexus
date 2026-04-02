@@ -1,7 +1,11 @@
 package com.quantnexus.repository;
 
+import aj.org.objectweb.asm.commons.Remapper;
 import com.quantnexus.domain.FinancialRecord;
+import com.quantnexus.domain.User;
 import com.quantnexus.domain.enums.TransactionType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,10 +16,27 @@ import java.util.UUID;
 @Repository
 public interface FinancialRecordRepository extends JpaRepository<FinancialRecord, UUID> {
 
+    /**
+     * Finds transactions filtered by user and type (INCOME/EXPENSE).
+     */
     List<FinancialRecord>findByUserIdAndTransactionType(Long userId, TransactionType transactionType);
 
+    /**
+     * Identifies all records for a specific user ID.
+     * PERFORMANCE NOTE: Leverages the DB-level index we planned for user_id.
+     */
     List<FinancialRecord> findByUserId(Long userId);
 
-    // Used for searching transactions by the human-readable Business Key
-    Optional<FinancialRecord> findByReferenceNumber(String refNumber);
+    /**
+     * Resolves a unique transaction by its public-facing reference number.
+     * Uses: TXN-YYYYMMDD-XXXX
+     */
+    Optional<FinancialRecord> findByReferenceNumber(String referenceNumber);
+
+    //Helper in Transaction Creation
+    //Fetches only the single most recent record to calculate 'balanceAfter' snapshot.
+    Optional<FinancialRecord>findFirstByUserIdOrderByTransactionDateDescCreatedAtDesc(Long userId);
+
+    //User's Transaction History
+    Page<FinancialRecord> findFirstByUserIdOrderByTransactionDateDescCreatedAtDesc(Long userId, Pageable pageable);
 }
