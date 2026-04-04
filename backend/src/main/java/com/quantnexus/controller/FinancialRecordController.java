@@ -2,6 +2,7 @@ package com.quantnexus.controller;
 
 import com.quantnexus.dto.financial.TransactionRequest;
 import com.quantnexus.dto.financial.TransactionResponse;
+import com.quantnexus.security.SecurityUser;
 import com.quantnexus.service.FinancialRecordService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -29,12 +32,15 @@ public class FinancialRecordController {
 
     /**
      * Records a new transaction in the ledger.
+     * ADMIN ONLY: "Can create, update, and manage records"
      * Returns 201 Created on success.
      */
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<TransactionResponse>createTransaction(
-            @RequestParam Long userId,
+            @AuthenticationPrincipal SecurityUser securityUser,
             @Valid @RequestBody TransactionRequest request){
+        Long userId = securityUser.getId();
         log.info("API Request: Create transaction for User {}", userId);
         TransactionResponse response = recordService.createTransaction(userId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -45,21 +51,25 @@ public class FinancialRecordController {
      * Implements dual-path security: validates record ownership or staff bypass.
      */
     @GetMapping("/{refNumber}")
+    @PreAuthorize("hasAnyRole('ADMIN','ANALYST')")
     public ResponseEntity<TransactionResponse>getByReferenceNumber(
-            @RequestParam Long userId,
-            @PathVariable String refNumber,
-            @RequestParam(defaultValue = "false") boolean isStaff){
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @PathVariable String refNumber){
+        Long userId = securityUser.getId();
         log.info("API Request: Fetch record {} for User {}", refNumber, userId);
-        return ResponseEntity.ok(recordService.getByReference(userId, refNumber, isStaff));
+        return ResponseEntity.ok(recordService.getByReference(userId, refNumber, true));
     }
 
     /**
      * Fetches a paginated history of transactions.
      * Supports sorting and sizing (e.g., /records?page=0&size=10&sort=transactionDate,desc)
      */
+    @GetMapping("/history")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST')")
     public ResponseEntity<Page<TransactionResponse>>getTransactionsHistory(
-            @RequestParam Long userId,
+            @AuthenticationPrincipal SecurityUser securityUser,
             @PageableDefault(size = 15) Pageable pageable){
+        Long userId = securityUser.getId();
         log.info("API Request: Fetch history for User {}", userId);
         return ResponseEntity.ok(recordService.getHistory(userId, pageable));
     }
@@ -69,6 +79,7 @@ public class FinancialRecordController {
      * Only accessible by ADMIN (Enforced in Service layer).
      */
     @DeleteMapping("/{refNumber}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteRecord(@PathVariable String refNumber) {
         log.warn("API Request: Delete record {}", refNumber);
         recordService.deleteRecord(refNumber);

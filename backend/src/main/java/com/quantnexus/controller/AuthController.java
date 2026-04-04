@@ -7,6 +7,7 @@ import com.quantnexus.dto.auth.RegistrationResponse;
 import com.quantnexus.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Accessible without JWT for these specific endpoints.
  * @author Manish Singh
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -27,26 +29,21 @@ public class AuthController {
     private final AuthService authService;
 
 
-    /**
-     * Registers a new user and returns their profile summary.
-     */
+    //Registers a new user and returns their profile summary.
     @PostMapping("/register")
     public ResponseEntity<RegistrationResponse>registerUser(
             @Valid @RequestBody RegisterRequest request
             ){
+        log.info("API Request: Registering new user");
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(authService.register(request));
     }
 
-
-    /**
-     * Authenticates a user and returns a JWT Bearer token.
-     */
+    //Authenticates a user and returns a JWT Bearer token.
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
             @Valid @RequestBody LoginRequest request) {
+        log.info("API Request: User login");
         return ResponseEntity.ok(authService.login(request));
     }
-
-
 }

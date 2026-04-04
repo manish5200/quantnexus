@@ -1,19 +1,18 @@
 spring:
-  datasource:
-    url: jdbc:h2:file:./data/quantnexus
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+  application:
+    name: QuantNexus
+  profiles:
+    active: dev # Defaults to H2 if you just hit "Run" in your IDE
 
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+server:
+  port: 8080
 
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+app:
+  security:
+    jwt:
+      expiration: 86400000 # 24 hours globally
+
+app:
+  admin:
+    email: manishneelambar@gmail.com
+    password: Admin@5200

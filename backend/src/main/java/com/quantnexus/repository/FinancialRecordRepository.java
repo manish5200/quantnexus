@@ -1,8 +1,6 @@
 package com.quantnexus.repository;
 
-import aj.org.objectweb.asm.commons.Remapper;
 import com.quantnexus.domain.FinancialRecord;
-import com.quantnexus.domain.User;
 import com.quantnexus.domain.enums.TransactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,7 +21,6 @@ public interface FinancialRecordRepository extends JpaRepository<FinancialRecord
 
     /**
      * Identifies all records for a specific user ID.
-     * PERFORMANCE NOTE: Leverages the DB-level index we planned for user_id.
      */
     List<FinancialRecord> findByUserId(Long userId);
 
