@@ -1,0 +1,124 @@
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework # Crucial if deploying behind a cloud load balancer (like AWS/Heroku)
+
+spring:
+  # ---------------------------------------------------------
+  # 1. DATABASE CONFIGURATION (Persistent H2 for Demo)
+  # ---------------------------------------------------------
+  datasource:
+    # Saves the database to a local file so demo data survives a reboot
+    url: ${DB_URL:jdbc:h2:file:./demo-data/quantnexus_demo;DB_CLOSE_DELAY=-1}
+    driver-class-name: org.h2.Driver
+    username: ${DB_USER:demo_admin}
+    password: ${DB_PASS:demo_secure_pass}
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: false # Security: Prevents external web access to the console
+
+  jpa:
+    hibernate:
+      ddl-auto: update # Auto-updates schema based on your Entities for the demo
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  # ---------------------------------------------------------
+  # 2. CLOUD CACHING (Upstash Redis)
+  # ---------------------------------------------------------
+  cache:
+    type: redis
+  data:
+    redis:
+      host: ${REDIS_HOST:demo-cache.upstash.io}
+      port: ${REDIS_PORT:38475}
+      password: ${REDIS_PASS:demo-upstash-token-12345}
+      ssl:
+        enabled: true
+
+  # ---------------------------------------------------------
+  # 3. EMAIL SERVICE (SMTP Configuration)
+  # ---------------------------------------------------------
+  mail:
+    host: ${MAIL_HOST:smtp.sendgrid.net}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USER:apikey}
+    password: ${MAIL_PASS:demo-sendgrid-api-key}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+  # ---------------------------------------------------------
+  # 4. OAUTH2 CONFIGURATION (Google / GitHub Login)
+  # ---------------------------------------------------------
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:demo-google-client-id.apps.googleusercontent.com}
+            client-secret: ${GOOGLE_CLIENT_SECRET:demo-google-secret}
+            scope:
+              - email
+              - profile
+          github:
+            client-id: ${GITHUB_CLIENT_ID:demo-github-client-id}
+            client-secret: ${GITHUB_CLIENT_SECRET:demo-github-secret}
+            scope:
+              - user:email
+              - read:user
+
+# ---------------------------------------------------------
+# 5. CUSTOM APPLICATION PROPERTIES (JWT & Business Logic)
+# ---------------------------------------------------------
+application:
+  security:
+    jwt:
+      # A highly secure 256-bit fallback key for the demo environment
+      secret-key: ${JWT_SECRET_KEY:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      # 86400000 ms = 24 hours (Standard session length)
+      expiration: ${JWT_EXP_MS:86400000}
+      # 604800000 ms = 7 days (For 'Remember Me' refresh tokens)
+      refresh-expiration: ${JWT_REFRESH_EXP_MS:604800000}
+
+  # Custom settings you might need for your frontend to talk to your backend
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS:https://demo.quantnexus.com,http://localhost:3000}
+
+# ---------------------------------------------------------
+# 6. ENTERPRISE OBSERVABILITY (Spring Boot Actuator)
+# ---------------------------------------------------------
+management:
+  endpoints:
+    web:
+      exposure:
+        # Exposes the /actuator/health endpoint so cloud providers know your app is alive
+        include: health, info
+  endpoint:
+    health:
+      show-details: always # Shows DB and Redis health status
+
+# ---------------------------------------------------------
+# 7. LOGGING CONFIGURATION
+# ---------------------------------------------------------
+logging:
+  level:
+    root: INFO
+    # Keep our app logs verbose enough to track demo usage, but hide Spring framework noise
+    com.quantnexus: INFO
+    org.springframework.security: WARN
+
+# Custom Application Configuration
+app:
+  admin:
+    email: "admin@quantnexus.com"
+    password: "SecurePassword123!" # Change this in your local application.yml!
