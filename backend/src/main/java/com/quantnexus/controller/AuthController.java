@@ -1,10 +1,9 @@
 package com.quantnexus.controller;
 
 import com.quantnexus.dto.auth.LoginRequest;
-import com.quantnexus.dto.auth.LoginResponse;
 import com.quantnexus.dto.auth.RegisterRequest;
-import com.quantnexus.dto.auth.RegistrationResponse;
 import com.quantnexus.service.AuthService;
+import com.quantnexus.service.RateLimitingService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,23 +29,40 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final RateLimitingService   rateLimitingService;
 
 
     //Registers a new user and returns their profile summary.
     @PostMapping("/register")
-    public ResponseEntity<RegistrationResponse>registerUser(
-            @Valid @RequestBody RegisterRequest request
+    public ResponseEntity<?>registerUser(
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletRequest httpRequest
             ){
+        String ipAddress = httpRequest.getRemoteAddr();
+
         log.info("API Request: Registering new user");
+
+        // 🛡️ Redis Anti-Spam Check
+        if(!rateLimitingService.allowLoginAttempt(ipAddress)){
+            return ResponseEntity.status(429).body("Spam Protection: Registration limit reached for this IP. Try again in 1 hour.");
+        }
+
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(authService.register(request));
     }
 
     //Authenticates a user and returns a JWT Bearer token.
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(
+    public ResponseEntity<?> login(
             @Valid @RequestBody LoginRequest request) {
         log.info("API Request: User login");
+
+        // 🛡️ Redis Anti-Brute-Force Check
+        if(!rateLimitingService.allowLoginAttempt(request.email())){
+            return ResponseEntity.status(429)
+                    .body("Security Block: Maximum login attempts reached. Please wait 60 seconds.");
+        }
+
         return ResponseEntity.ok(authService.login(request));
     }
 
