@@ -64,6 +64,7 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private UserStatus userStatus = UserStatus.ACTIVE;
 
     // --- Auditing & Security (High Value) ---
@@ -76,6 +77,7 @@ public class User {
 
     private LocalDateTime lastLoginAt;
 
+    @Builder.Default
     private int failedLoginAttempts = 0; // Modern security addition
 
 }

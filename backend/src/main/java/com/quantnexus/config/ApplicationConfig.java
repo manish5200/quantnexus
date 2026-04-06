@@ -32,7 +32,8 @@ public class ApplicationConfig {
      */
     @Bean
     public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider daoAuthProvider = new DaoAuthenticationProvider(userDetailsService);
+        DaoAuthenticationProvider daoAuthProvider = new DaoAuthenticationProvider();
+        daoAuthProvider.setUserDetailsService(userDetailsService);
         daoAuthProvider.setPasswordEncoder(passwordEncoder());
         return daoAuthProvider;
     }
@@ -42,7 +43,8 @@ public class ApplicationConfig {
      * We inject this into our AuthService to trigger the login verification.
      */
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfiguration) {
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration authConfiguration) throws Exception {
         return authConfiguration.getAuthenticationManager();
     }
 
